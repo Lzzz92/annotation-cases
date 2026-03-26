@@ -1,0 +1,1720 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JSON 格式检测工具</title>
+  <style>
+    /* === Design Tokens === */
+    :root {
+      /* 背景 & 表面 */
+      --bg:          #f8fafc;
+      --surface:     #ffffff;
+      --surface-sub: #f8fafc;
+
+      /* 边框 */
+      --border:      #e2e8f0;
+      --border-strong: #cbd5e0;
+
+      /* 文字 */
+      --text:        #0f172a;
+      --text-muted:  #64748b;
+      --text-subtle: #94a3b8;
+
+      /* 主色 — 蓝色，用于交互、按钮、链接 */
+      --blue:        #2563eb;
+      --blue-hover:  #1d4ed8;
+      --blue-bg:     #eff6ff;
+      --blue-border: #bfdbfe;
+      --blue-ring:   rgba(37,99,235,0.12);
+
+      /* 正向色 — 绿色：验证通过 + Showcase，语义统一 */
+      --green:       #16a34a;
+      --green-hover: #15803d;
+      --green-bg:    #f0fdf4;
+      --green-border: #bbf7d0;
+
+      /* 负向色 — 红色：验证错误 + Badcase，语义统一 */
+      --red:         #dc2626;
+      --red-hover:   #b91c1c;
+      --red-bg:      #fef2f2;
+      --red-border:  #fecaca;
+
+      /* 警告色 — 仅用于警告类错误 */
+      --amber:       #d97706;
+      --amber-bg:    #fffbeb;
+      --amber-border: #fde68a;
+
+      /* 圆角 — 统一刻度 */
+      --r-xs:   4px;
+      --r-sm:   6px;
+      --r-md:   8px;
+      --r-lg:   10px;
+      --r-xl:   14px;
+      --r-pill: 999px;
+
+      /* 阴影 */
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow:    0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    /* === 重置 & 基础 === */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* === 布局 === */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 20px 60px;
+    }
+
+    /* === 头部 === */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+    .header-top {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px 20px 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .header-brand { padding-bottom: 16px; }
+    .header-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-title .icon {
+      width: 30px; height: 30px;
+      background: var(--blue);
+      border-radius: var(--r-sm);
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 15px; flex-shrink: 0;
+    }
+    .header-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 3px;
+      margin-left: 40px;
+    }
+
+    /* === 导航标签 === */
+    .nav-tabs { display: flex; align-self: flex-end; }
+    .nav-tab {
+      padding: 10px 20px;
+      font-size: 14px; font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer; border: none; background: transparent;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .nav-tab:hover { color: var(--text); }
+    .nav-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .nav-badge {
+      font-size: 11px; font-weight: 600;
+      padding: 1px 6px; border-radius: var(--r-pill);
+      background: var(--border); color: var(--text-muted);
+      transition: background 0.15s, color 0.15s;
+    }
+    .nav-tab.active .nav-badge { background: var(--blue-bg); color: var(--blue); }
+
+    /* === 卡片 === */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-label {
+      font-size: 11px; font-weight: 700;
+      color: var(--text-subtle);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+
+    /* === 文本框 === */
+    #json-input {
+      width: 100%; min-height: 380px;
+      font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", "Menlo", monospace;
+      font-size: 13px; line-height: 1.65;
+      padding: 14px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--r-md);
+      background: var(--surface-sub);
+      color: var(--text); resize: vertical; outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      white-space: pre;
+    }
+    #json-input:focus {
+      border-color: var(--blue);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px var(--blue-ring);
+    }
+    #json-input::placeholder { color: var(--text-subtle); font-size: 12px; }
+
+    /* === 按钮 === */
+    .btn-row {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-top: 14px; gap: 10px;
+    }
+    .shortcut-hint { font-size: 12px; color: var(--text-subtle); }
+    .shortcut-hint kbd {
+      font-family: inherit;
+      background: var(--bg); border: 1px solid var(--border-strong);
+      border-radius: var(--r-xs); padding: 1px 5px; font-size: 11px;
+    }
+    .btn-group { display: flex; gap: 8px; }
+    .btn {
+      padding: 9px 18px; border-radius: var(--r-md); border: none;
+      font-size: 14px; font-weight: 500; cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn-ghost {
+      background: transparent; color: var(--text-muted);
+      border: 1.5px solid var(--border);
+    }
+    .btn-ghost:hover { background: var(--bg); color: var(--text); border-color: var(--border-strong); }
+
+    .btn-primary {
+      background: var(--blue); color: white;
+      padding: 9px 24px;
+      box-shadow: 0 1px 3px rgba(37,99,235,0.25);
+    }
+    .btn-primary:hover { background: var(--blue-hover); }
+    .btn-primary:active { transform: translateY(1px); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* Showcase & Badcase 按钮 — 与验证结果颜色统一 */
+    .btn-showcase {
+      background: var(--green-bg); color: var(--green);
+      border: 1.5px solid var(--green-border);
+    }
+    .btn-showcase:hover { background: #dcfce7; border-color: var(--green); }
+
+    .btn-badcase {
+      background: var(--red-bg); color: var(--red);
+      border: 1.5px solid var(--red-border);
+    }
+    .btn-badcase:hover { background: #fee2e2; border-color: var(--red); }
+
+    .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: var(--r-sm); }
+
+    /* === 收录操作栏 === */
+    .save-action-bar {
+      display: none; align-items: center; gap: 10px;
+      margin-top: 20px; padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .save-action-bar.visible { display: flex; }
+    .save-action-hint { font-size: 13px; color: var(--text-muted); flex: 1; }
+
+    /* === 结果区域 === */
+    #results { display: none; }
+    .result-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 16px; padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .result-icon {
+      width: 34px; height: 34px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .result-icon.success { background: var(--green-bg); color: var(--green); }
+    .result-icon.error   { background: var(--red-bg);   color: var(--red);   }
+    .result-icon.warning { background: var(--amber-bg); color: var(--amber); }
+    .result-title { font-size: 15px; font-weight: 600; }
+    .result-title.success { color: var(--green); }
+    .result-title.error   { color: var(--red);   }
+    .result-title.warning { color: var(--amber); }
+
+    /* 格式标签 — 统一蓝色系 */
+    .result-format-tag {
+      margin-left: auto; font-size: 11px; font-weight: 600;
+      padding: 3px 10px; border-radius: var(--r-pill);
+      white-space: nowrap; letter-spacing: 0.02em;
+    }
+    .tag-openai    { background: var(--blue-bg);  color: var(--blue);  border: 1px solid var(--blue-border); }
+    .tag-anthropic { background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; }
+    .tag-unknown   { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* === 成功/错误状态体 === */
+    .success-body {
+      background: var(--green-bg); border: 1px solid var(--green-border);
+      border-radius: var(--r-md); padding: 14px 18px;
+      color: var(--green); font-size: 14px;
+    }
+    .error-summary { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+    .error-list { display: flex; flex-direction: column; gap: 10px; }
+    .error-item {
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--red);
+      border-radius: var(--r-md);
+      padding: 13px 15px;
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+    }
+    /* 错误类型 — 简化为两色系：红（严重）、琥珀（结构） */
+    .error-item.cat-syntax  { border-left-color: var(--red); }
+    .error-item.cat-logic   { border-left-color: var(--red); }
+    .error-item.cat-missing { border-left-color: var(--amber); }
+    .error-item.cat-type    { border-left-color: var(--amber); }
+    .error-item.cat-value   { border-left-color: var(--amber); }
+    .error-item.cat-warning { border-left-color: var(--amber); border-color: var(--amber-border); }
+
+    .error-top { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 7px; flex-wrap: wrap; }
+    .error-badge {
+      font-size: 11px; font-weight: 600;
+      padding: 2px 7px; border-radius: var(--r-xs);
+      white-space: nowrap; flex-shrink: 0; margin-top: 1px;
+    }
+    /* badge 也简化为两色系 */
+    .badge-syntax  { background: var(--red-bg);   color: var(--red);   }
+    .badge-logic   { background: var(--red-bg);   color: var(--red);   }
+    .badge-missing { background: var(--amber-bg); color: var(--amber); }
+    .badge-type    { background: var(--amber-bg); color: var(--amber); }
+    .badge-value   { background: var(--amber-bg); color: var(--amber); }
+    .badge-warning { background: var(--amber-bg); color: var(--amber); }
+
+    .error-path {
+      font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+      font-size: 11px; color: var(--text-muted); word-break: break-all;
+    }
+    .error-message { font-size: 14px; color: var(--text); font-weight: 500; margin-bottom: 5px; }
+    .error-suggestion { font-size: 13px; color: var(--text-muted); }
+    .error-suggestion code, .error-code-block {
+      font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+      background: var(--bg); padding: 1px 5px;
+      border-radius: var(--r-xs); font-size: 12px; color: #334155;
+    }
+    .error-code-block {
+      display: block; margin-top: 6px; padding: 8px 10px;
+      white-space: pre; overflow-x: auto;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+    }
+
+    /* === 空状态 === */
+    .empty-state { text-align: center; padding: 56px 20px; color: var(--text-subtle); }
+    .empty-state .big-icon { font-size: 44px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; }
+
+    /* === Modal === */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(15,23,42,0.4);
+      z-index: 1000; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface); border-radius: var(--r-xl); padding: 28px;
+      width: 100%; max-width: 460px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+      animation: modalIn 0.16s ease;
+    }
+    @keyframes modalIn {
+      from { transform: translateY(8px) scale(0.97); opacity: 0; }
+      to   { transform: translateY(0)   scale(1);    opacity: 1; }
+    }
+    .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 5px; }
+    .modal-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+    .modal-label { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .modal-textarea {
+      width: 100%; height: 88px; padding: 10px 12px;
+      border: 1.5px solid var(--border); border-radius: var(--r-md);
+      font-size: 14px; font-family: inherit; resize: vertical; outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s; color: var(--text);
+    }
+    .modal-textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-ring); }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+    /* Modal 确认按钮与对应语义色统一 */
+    .modal-confirm-showcase { background: var(--green); color: white; }
+    .modal-confirm-showcase:hover { background: var(--green-hover); }
+    .modal-confirm-badcase  { background: var(--red);   color: white; }
+    .modal-confirm-badcase:hover  { background: var(--red-hover); }
+
+    /* === 案例库视图 === */
+    #view-library { display: none; }
+    .library-stats {
+      display: flex; align-items: center; gap: 20px;
+      margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .lib-stat { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-muted); }
+    .lib-stat strong { color: var(--text); font-size: 20px; font-weight: 700; }
+    .lib-stat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .lib-stat-dot.showcase { background: var(--green); }
+    .lib-stat-dot.badcase  { background: var(--red); }
+
+    .library-filter { display: flex; gap: 6px; margin-left: auto; }
+    .filter-btn {
+      padding: 5px 14px; border-radius: var(--r-pill);
+      border: 1.5px solid var(--border); background: transparent;
+      font-size: 13px; font-weight: 500; color: var(--text-muted);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .filter-btn:hover { border-color: var(--border-strong); color: var(--text); }
+    .filter-btn.active-all      { background: var(--text);  color: #fff; border-color: var(--text); }
+    .filter-btn.active-showcase { background: var(--green); color: #fff; border-color: var(--green); }
+    .filter-btn.active-badcase  { background: var(--red);   color: #fff; border-color: var(--red); }
+
+    /* === 案例卡片 === */
+    .case-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r-lg); box-shadow: var(--shadow);
+      margin-bottom: 14px; overflow: hidden;
+    }
+    .case-card-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      background: var(--surface-sub);
+    }
+    .case-type-badge {
+      font-size: 11px; font-weight: 700;
+      padding: 2px 8px; border-radius: var(--r-xs);
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    /* 与 lib-stat-dot、filter-btn、btn-showcase/badcase 颜色统一 */
+    .case-type-badge.showcase {
+      background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border);
+    }
+    .case-type-badge.badcase {
+      background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border);
+    }
+    /* case 内格式标签复用同一蓝色系 */
+    .case-format-tag {
+      font-size: 11px; padding: 2px 8px;
+      border-radius: var(--r-pill); font-weight: 500;
+    }
+    .case-date { font-size: 12px; color: var(--text-subtle); margin-left: auto; }
+    .case-delete-btn {
+      padding: 3px 7px; font-size: 12px; border-radius: var(--r-sm);
+      border: none; background: transparent; color: var(--text-subtle);
+      cursor: pointer; transition: all 0.15s; line-height: 1;
+    }
+    .case-delete-btn:hover { color: var(--red); background: var(--red-bg); }
+
+    .case-card-body { padding: 16px; }
+    .case-description { font-size: 14px; color: var(--text); margin-bottom: 10px; font-weight: 500; }
+    .case-no-desc { font-size: 13px; color: var(--text-subtle); font-style: italic; margin-bottom: 10px; }
+
+    .case-json-wrap { position: relative; }
+    .case-json-preview {
+      font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+      font-size: 12px; color: #475569; background: var(--surface-sub);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 10px 12px; white-space: pre; overflow: hidden;
+      max-height: 96px; line-height: 1.6; cursor: pointer;
+    }
+    .case-json-preview.expanded { max-height: none; overflow: auto; cursor: default; }
+    .case-json-fade {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 36px;
+      background: linear-gradient(transparent, var(--surface-sub));
+      border-radius: 0 0 var(--r-sm) var(--r-sm); pointer-events: none;
+    }
+    .case-json-fade.hidden { display: none; }
+
+    .case-errors-section { margin-top: 10px; }
+    .case-errors-toggle {
+      font-size: 12px; color: var(--text-muted); cursor: pointer; user-select: none;
+      display: flex; align-items: center; gap: 4px;
+      width: fit-content; margin-bottom: 8px;
+    }
+    .case-errors-toggle:hover { color: var(--text); }
+    .case-errors-list { display: none; flex-direction: column; gap: 5px; }
+    .case-errors-list.open { display: flex; }
+    .case-mini-error {
+      font-size: 12px; padding: 5px 10px;
+      background: var(--red-bg); border-left: 2px solid var(--red);
+      border-radius: var(--r-sm); color: #7f1d1d;
+    }
+
+    .case-card-footer {
+      display: flex; gap: 8px; padding: 10px 16px;
+      border-top: 1px solid var(--border); background: var(--surface-sub);
+    }
+    .case-copy-btn, .case-load-btn {
+      padding: 5px 14px; font-size: 12px; border-radius: var(--r-sm);
+      font-weight: 500; cursor: pointer;
+      border: 1.5px solid var(--border);
+      background: var(--surface); color: var(--text-muted);
+      transition: all 0.15s;
+    }
+    .case-copy-btn:hover { color: var(--blue); border-color: var(--blue-border); background: var(--blue-bg); }
+    .case-load-btn:hover { color: var(--text); border-color: var(--border-strong); }
+
+    /* === 设置按钮 === */
+    .settings-btn {
+      padding: 6px 10px; border-radius: var(--r-sm);
+      border: 1.5px solid var(--border); background: transparent;
+      color: var(--text-muted); cursor: pointer; font-size: 15px;
+      transition: all 0.15s; line-height: 1; align-self: center;
+      margin-bottom: 3px;
+    }
+    .settings-btn:hover { color: var(--text); border-color: var(--border-strong); background: var(--bg); }
+
+    /* === 同步状态栏 === */
+    .sync-bar {
+      display: none; align-items: center; gap: 8px;
+      font-size: 12px; color: var(--text-muted);
+      margin-bottom: 16px; padding: 8px 12px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--r-md);
+    }
+    .sync-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .sync-dot.ok      { background: var(--green); }
+    .sync-dot.loading { background: var(--amber); animation: syncPulse 1s infinite; }
+    .sync-dot.error   { background: var(--red); }
+    .sync-dot.local   { background: var(--text-subtle); }
+    @keyframes syncPulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+    .sync-action {
+      margin-left: auto; font-size: 12px; color: var(--blue);
+      cursor: pointer; background: none; border: none; padding: 0;
+    }
+    .sync-action:hover { text-decoration: underline; }
+
+    /* === 设置 Modal === */
+    .settings-modal { max-width: 540px; }
+    .settings-guide {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--r-md); padding: 14px 16px; margin-bottom: 18px;
+    }
+    .guide-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--text-subtle); margin-bottom: 8px;
+    }
+    .guide-steps {
+      padding-left: 18px; color: var(--text-muted);
+      font-size: 13px; line-height: 1.9; margin: 0;
+    }
+    .guide-steps a { color: var(--blue); text-decoration: none; }
+    .guide-steps a:hover { text-decoration: underline; }
+    .guide-steps code {
+      background: var(--border); padding: 1px 5px;
+      border-radius: var(--r-xs); font-family: monospace; font-size: 12px;
+    }
+    .modal-input {
+      width: 100%; padding: 9px 12px;
+      border: 1.5px solid var(--border); border-radius: var(--r-md);
+      font-size: 14px; font-family: inherit; outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      color: var(--text); background: var(--surface);
+    }
+    .modal-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-ring); }
+    .settings-status {
+      padding: 8px 12px; border-radius: var(--r-sm);
+      font-size: 13px; margin-bottom: 16px;
+    }
+    .settings-status.connected { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+    .settings-status.disconnected { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* === 响应式 === */
+    @media (max-width: 640px) {
+      .header-top { flex-direction: column; align-items: flex-start; gap: 0; }
+      #json-input { min-height: 240px; }
+      .btn-row { flex-wrap: wrap; }
+      .result-format-tag { margin-left: 0; }
+      .library-stats { gap: 12px; }
+      .library-filter { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ====== 头部 + 导航 ====== -->
+<header>
+  <div class="header-top">
+    <div class="header-brand">
+      <div class="header-title">
+        <div class="icon">⚡</div>
+        JSON 格式检测工具
+      </div>
+      <div class="header-subtitle">用于验证 LLM 工具调用训练数据脚本格式（支持 OpenAI / Anthropic）</div>
+    </div>
+    <div style="display:flex;align-items:flex-end;gap:4px;">
+      <nav class="nav-tabs">
+        <button class="nav-tab active" id="tab-validator" onclick="switchView('validator')">
+          验证器
+        </button>
+        <button class="nav-tab" id="tab-library" onclick="switchView('library')">
+          案例库
+          <span class="nav-badge" id="lib-count-badge">0</span>
+        </button>
+      </nav>
+      <button class="settings-btn" onclick="openSettings()" title="云同步配置">⚙</button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- ====== 验证器视图 ====== -->
+  <div id="view-validator">
+
+    <!-- 输入卡片 -->
+    <div class="card">
+      <div class="card-label">粘贴 JSON 数据</div>
+      <textarea id="json-input" spellcheck="false" placeholder='{
+  "messages": [
+    {"role": "user", "content": "查询北京天气"},
+    {
+      "role": "assistant",
+      "tool_calls": [{
+        "id": "call_001",
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "arguments": "{\"city\": \"北京\"}"
+        }
+      }]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_001",
+      "content": "晴，25°C"
+    }
+  ]
+}'></textarea>
+      <div class="btn-row">
+        <div class="shortcut-hint">快捷键：<kbd>Ctrl</kbd>+<kbd>Enter</kbd> 验证</div>
+        <div class="btn-group">
+          <button class="btn btn-ghost" id="btn-clear">清空</button>
+          <button class="btn btn-primary" id="btn-validate">验证</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 结果卡片 -->
+    <div class="card" id="results">
+      <div id="result-content">
+        <div class="empty-state">
+          <div class="big-icon">🔍</div>
+          <p>粘贴 JSON 数据后点击「验证」</p>
+        </div>
+      </div>
+      <!-- 收录操作栏 -->
+      <div class="save-action-bar" id="save-action-bar">
+        <div class="save-action-hint" id="save-action-hint"></div>
+        <button class="btn btn-showcase btn-sm" id="btn-add-showcase" style="display:none" onclick="openModal('showcase')">
+          ★ 收录为 Showcase
+        </button>
+        <button class="btn btn-badcase btn-sm" id="btn-add-badcase" style="display:none" onclick="openModal('badcase')">
+          ⚑ 收录为 Badcase
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ====== 案例库视图 ====== -->
+  <div id="view-library">
+    <div class="card">
+      <!-- 同步状态栏 -->
+      <div class="sync-bar" id="sync-bar">
+        <div class="sync-dot local" id="sync-dot"></div>
+        <span id="sync-text">未配置云同步</span>
+        <button class="sync-action" onclick="syncFromCloud()">立即同步</button>
+      </div>
+      <div class="library-stats">
+        <div class="lib-stat">
+          <div class="lib-stat-dot showcase"></div>
+          Showcase <strong id="stat-showcase">0</strong>
+        </div>
+        <div class="lib-stat">
+          <div class="lib-stat-dot badcase"></div>
+          Badcase <strong id="stat-badcase">0</strong>
+        </div>
+        <div class="library-filter">
+          <button class="filter-btn active-all" id="filter-all"       onclick="setFilter('all')">全部</button>
+          <button class="filter-btn"            id="filter-showcase"  onclick="setFilter('showcase')">Showcase</button>
+          <button class="filter-btn"            id="filter-badcase"   onclick="setFilter('badcase')">Badcase</button>
+        </div>
+      </div>
+      <div id="library-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ====== GitHub 同步设置 Modal ====== -->
+<div class="modal-overlay" id="settings-overlay" onclick="handleSettingsOverlay(event)">
+  <div class="modal settings-modal">
+    <div class="modal-title">⚙ GitHub 同步配置</div>
+    <div class="modal-subtitle">案例库存储在 GitHub 仓库的 <code style="font-size:12px;background:var(--bg);padding:1px 5px;border-radius:3px;">cases.json</code> 中，标注员打开页面即可自动读取，无需配置</div>
+
+    <div id="settings-status" class="settings-status disconnected">未配置，当前案例库仅保存在本地浏览器</div>
+
+    <div class="settings-guide">
+      <div class="guide-title">管理员一次性配置步骤</div>
+      <ol class="guide-steps">
+        <li>在 GitHub 创建一个<strong>公开仓库</strong>（如 <code>annotation-cases</code>）</li>
+        <li>在仓库根目录新建文件 <code>cases.json</code>，内容填写 <code>[]</code>，提交</li>
+        <li>进入仓库 <strong>Settings → Pages</strong>，Source 选 <strong>Deploy from a branch → main / root</strong>，保存</li>
+        <li>将 <code>validator.html</code> 也上传到仓库根目录，提交</li>
+        <li>去 GitHub <strong>Settings → Developer settings → Personal access tokens → Fine-grained tokens</strong>，生成一个 Token，权限勾选对应仓库的 <strong>Contents: Read and Write</strong></li>
+        <li>将下方信息填好后「保存配置」；把 GitHub Pages 链接分享给标注员即可，<strong>标注员无需任何配置</strong></li>
+      </ol>
+    </div>
+
+    <div class="modal-label">GitHub 用户名 / 组织名</div>
+    <input type="text" class="modal-input" id="settings-gh-owner" placeholder="例如：mycompany" />
+
+    <div class="modal-label" style="margin-top:12px;">仓库名</div>
+    <input type="text" class="modal-input" id="settings-gh-repo" placeholder="例如：annotation-cases" />
+
+    <div class="modal-label" style="margin-top:12px;">Personal Access Token（管理员填写，用于写入案例）</div>
+    <input type="password" class="modal-input" id="settings-gh-token" placeholder="github_pat_... 或 ghp_..." />
+    <div style="font-size:12px;color:var(--text-subtle);margin-top:4px;">Token 仅保存在本地浏览器，不会上传。标注员只读时可留空。</div>
+
+    <div class="modal-footer" style="justify-content:space-between;margin-top:20px;">
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost btn-sm" id="settings-test-btn" onclick="testCloudConnection()">测试连接</button>
+        <button class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1.5px solid var(--red-border);" onclick="clearCloudSettings()">清除配置</button>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="closeSettings()">取消</button>
+        <button class="btn btn-primary btn-sm" onclick="saveSettings()">保存配置</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 保存 Modal ====== -->
+<div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">收录为 Showcase</div>
+    <div class="modal-subtitle" id="modal-subtitle">可以添加描述，帮助标注员理解这个案例的亮点</div>
+    <div class="modal-label">案例描述（可选）</div>
+    <textarea class="modal-textarea" id="modal-desc" placeholder="例如：多轮对话，涉及天气查询工具，参数结构规范…"></textarea>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+      <button class="btn" id="modal-confirm" onclick="confirmSave()">确认收录</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // 工具函数
+  // ============================================================
+
+  function escapeHTML(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function offsetToLineCol(source, offset) {
+    const lines = source.substring(0, offset).split('\n');
+    return { line: lines.length, col: lines[lines.length - 1].length + 1 };
+  }
+
+  function tryParseJSON(str) {
+    try { return { ok: true, value: JSON.parse(str) }; }
+    catch (e) { return { ok: false, error: e }; }
+  }
+
+  function isPlainObject(v) {
+    return v !== null && typeof v === 'object' && !Array.isArray(v);
+  }
+
+  function msgPath(i) { return `消息[${i}]`; }
+  function tcPath(i, j) { return `消息[${i}] > tool_calls[${j}]`; }
+  function blockPath(i, j) { return `消息[${i}] > content[${j}]`; }
+
+  function genId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
+  function formatDate(isoStr) {
+    const d = new Date(isoStr);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+
+  // ============================================================
+  // 案例库 Storage（本地 + 云端双写）
+  // ============================================================
+
+  const STORAGE_KEY   = 'json_validator_cases_v1';
+  const CLOUD_CFG_KEY = 'json_validator_cloud_v1';
+
+  // --- 本地存储 ---
+  function loadCases() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+    catch { return []; }
+  }
+  function saveCasesToStorage(cases) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cases));
+  }
+
+  // --- 云同步配置 ---
+  function getCloudCfg() {
+    try { return JSON.parse(localStorage.getItem(CLOUD_CFG_KEY)); }
+    catch { return null; }
+  }
+  function setCloudCfg(cfg) {
+    if (cfg) localStorage.setItem(CLOUD_CFG_KEY, JSON.stringify(cfg));
+    else localStorage.removeItem(CLOUD_CFG_KEY);
+  }
+
+  // --- GitHub API ---
+  // 自动从 GitHub Pages URL 推断仓库信息（标注员无需手动配置）
+  function detectGitHubFromUrl() {
+    const host = window.location.hostname;
+    const path = window.location.pathname;
+    if (host.endsWith('.github.io')) {
+      const owner = host.replace('.github.io', '');
+      const repo  = path.split('/').filter(Boolean)[0] || '';
+      if (owner && repo) return { owner, repo, token: '' };
+    }
+    return null;
+  }
+
+  // 获取完整配置（手动配置 > URL 自动检测）
+  function getEffectiveCfg() {
+    return getCloudCfg() || detectGitHubFromUrl();
+  }
+
+  async function cloudGet(cfg) {
+    // 公开仓库直接读 raw，无需 token，绕过缓存
+    const url = `https://raw.githubusercontent.com/${cfg.owner}/${cfg.repo}/main/cases.json?t=${Date.now()}`;
+    const headers = {};
+    if (cfg.token) headers['Authorization'] = `token ${cfg.token}`;
+    const r = await fetch(url, { headers });
+    if (!r.ok) throw new Error(`HTTP ${r.status}，请检查仓库名和网络`);
+    const data = await r.json();
+    return Array.isArray(data) ? data : [];
+  }
+
+  async function cloudPut(cfg, cases) {
+    if (!cfg.token) throw new Error('写入需要 Personal Access Token，请在 ⚙ 中配置');
+    // 先获取文件当前 SHA（GitHub API 要求）
+    const infoRes = await fetch(
+      `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/cases.json`,
+      { headers: { 'Authorization': `token ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' } }
+    );
+    if (!infoRes.ok) throw new Error(`获取文件信息失败 HTTP ${infoRes.status}`);
+    const info = await infoRes.json();
+
+    // 将 cases 数组 base64 编码后写入
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(cases, null, 2))));
+    const putRes = await fetch(
+      `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/cases.json`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${cfg.token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/vnd.github.v3+json'
+        },
+        body: JSON.stringify({ message: 'chore: update cases.json', content, sha: info.sha })
+      }
+    );
+    if (!putRes.ok) throw new Error(`写入失败 HTTP ${putRes.status}`);
+  }
+
+  // --- 同步状态 UI ---
+  function setSyncStatus(state, msg) {
+    const bar  = document.getElementById('sync-bar');
+    const dot  = document.getElementById('sync-dot');
+    const text = document.getElementById('sync-text');
+    if (!bar) return;
+    bar.style.display = 'flex';
+    dot.className = 'sync-dot ' + state;
+    text.textContent = msg;
+  }
+  function fmtTime(d) {
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+
+  // --- 从 GitHub 拉取并更新本地 ---
+  async function syncFromCloud() {
+    const cfg = getEffectiveCfg();
+    if (!cfg) return;
+    setSyncStatus('loading', '同步中…');
+    try {
+      const cases = await cloudGet(cfg);
+      saveCasesToStorage(cases);
+      updateBadgeCount();
+      renderLibrary();
+      setSyncStatus('ok', `已同步 ${fmtTime(new Date())}，共 ${cases.length} 条案例`);
+    } catch (e) {
+      setSyncStatus('error', `同步失败（${e.message}），显示本地缓存`);
+    }
+  }
+
+  // --- 写入（本地立即更新 + GitHub 异步双写）---
+  async function addCase(type, json, format, errors, description) {
+    const cases = loadCases();
+    cases.unshift({
+      id: genId(), type, format: format || 'unknown',
+      json, description: description.trim(),
+      errors: errors || [], createdAt: new Date().toISOString()
+    });
+    saveCasesToStorage(cases);
+    updateBadgeCount();
+    const cfg = getEffectiveCfg();
+    if (cfg) {
+      setSyncStatus('loading', '提交到 GitHub…');
+      try { await cloudPut(cfg, cases); setSyncStatus('ok', `已提交 ${fmtTime(new Date())}`); }
+      catch (e) { setSyncStatus('error', `提交失败（${e.message}）`); }
+    }
+  }
+
+  async function deleteCase(id) {
+    const cases = loadCases().filter(c => c.id !== id);
+    saveCasesToStorage(cases);
+    updateBadgeCount();
+    renderLibrary();
+    const cfg = getEffectiveCfg();
+    if (cfg) {
+      setSyncStatus('loading', '提交到 GitHub…');
+      try { await cloudPut(cfg, cases); setSyncStatus('ok', `已提交 ${fmtTime(new Date())}`); }
+      catch (e) { setSyncStatus('error', `提交失败（${e.message}）`); }
+    }
+  }
+
+  function updateBadgeCount() {
+    const cases = loadCases();
+    document.getElementById('lib-count-badge').textContent = cases.length;
+    document.getElementById('stat-showcase').textContent = cases.filter(c => c.type === 'showcase').length;
+    document.getElementById('stat-badcase').textContent = cases.filter(c => c.type === 'badcase').length;
+  }
+
+  // ============================================================
+  // 云同步设置弹窗
+  // ============================================================
+
+  function openSettings() {
+    const cfg = getCloudCfg();
+    document.getElementById('settings-gh-owner').value = cfg?.owner || '';
+    document.getElementById('settings-gh-repo').value  = cfg?.repo  || '';
+    document.getElementById('settings-gh-token').value = cfg?.token || '';
+    _refreshSettingsStatus();
+    document.getElementById('settings-overlay').classList.add('open');
+  }
+  function closeSettings() {
+    document.getElementById('settings-overlay').classList.remove('open');
+  }
+  function handleSettingsOverlay(e) {
+    if (e.target === document.getElementById('settings-overlay')) closeSettings();
+  }
+  function _refreshSettingsStatus() {
+    const cfg  = getCloudCfg();
+    const auto = detectGitHubFromUrl();
+    const el   = document.getElementById('settings-status');
+    if (cfg) {
+      el.className = 'settings-status connected';
+      el.textContent = `✓ 已配置 GitHub 同步（${cfg.owner}/${cfg.repo}）${cfg.token ? '，有写入权限' : '，只读'}`;
+    } else if (auto) {
+      el.className = 'settings-status connected';
+      el.textContent = `✓ 自动检测到仓库 ${auto.owner}/${auto.repo}（只读，如需写入请配置 Token）`;
+    } else {
+      el.className = 'settings-status disconnected';
+      el.textContent = '未配置，当前案例库仅保存在本地浏览器';
+    }
+  }
+  async function testCloudConnection() {
+    const owner = document.getElementById('settings-gh-owner').value.trim();
+    const repo  = document.getElementById('settings-gh-repo').value.trim();
+    const token = document.getElementById('settings-gh-token').value.trim();
+    if (!owner || !repo) { alert('请填写 GitHub 用户名和仓库名'); return; }
+    const btn = document.getElementById('settings-test-btn');
+    btn.textContent = '连接中…'; btn.disabled = true;
+    try {
+      await cloudGet({ owner, repo, token });
+      btn.textContent = '✓ 连接成功'; btn.style.color = 'var(--green)';
+    } catch (e) {
+      btn.textContent = '✗ 连接失败'; btn.style.color = 'var(--red)';
+      alert(`连接失败：${e.message}\n\n请检查：\n1. 仓库是否存在且为公开仓库\n2. cases.json 是否已在仓库根目录\n3. 网络是否正常`);
+    } finally {
+      btn.disabled = false;
+      setTimeout(() => { btn.textContent = '测试连接'; btn.style.color = ''; }, 3000);
+    }
+  }
+  function saveSettings() {
+    const owner = document.getElementById('settings-gh-owner').value.trim();
+    const repo  = document.getElementById('settings-gh-repo').value.trim();
+    const token = document.getElementById('settings-gh-token').value.trim();
+    if (!owner || !repo) { alert('请填写 GitHub 用户名和仓库名'); return; }
+    setCloudCfg({ owner, repo, token });
+    _refreshSettingsStatus();
+    closeSettings();
+    setSyncStatus('loading', '首次同步中…');
+    syncFromCloud();
+  }
+  function clearCloudSettings() {
+    if (!confirm('确认清除 GitHub 同步配置？之后案例库将只保存在本地。')) return;
+    setCloudCfg(null);
+    _refreshSettingsStatus();
+    const bar = document.getElementById('sync-bar');
+    if (bar) { const auto = detectGitHubFromUrl(); bar.style.display = auto ? 'flex' : 'none'; }
+    closeSettings();
+  }
+
+  // ============================================================
+  // 格式识别
+  // ============================================================
+
+  function detectFormat(parsed) {
+    if (!parsed || !Array.isArray(parsed.messages)) return null;
+    const msgs = parsed.messages;
+
+    const hasOpenAI = msgs.some(m =>
+      m.role === 'tool' || Array.isArray(m.tool_calls) || typeof m.tool_call_id === 'string'
+    );
+    const hasAnthropic = msgs.some(m =>
+      Array.isArray(m.content) && m.content.some(b =>
+        b && (b.type === 'tool_use' || b.type === 'tool_result')
+      )
+    );
+
+    if (hasOpenAI && hasAnthropic) return 'mixed';
+    if (hasOpenAI) return 'openai';
+    if (hasAnthropic) return 'anthropic';
+    return 'unknown';
+  }
+
+  // ============================================================
+  // OpenAI 验证器
+  // ============================================================
+
+  function validateOpenAI(messages) {
+    const errors = [];
+    const VALID_ROLES = ['system', 'user', 'assistant', 'tool'];
+    const emittedCalls = new Map();
+    const consumedIds = new Map();
+
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      const path = msgPath(i);
+
+      if (!('role' in msg)) {
+        errors.push({ path, category: 'missing', label: '字段缺失',
+          message: '缺少必填字段 "role"',
+          suggestion: '在消息对象中添加 "role" 字段，有效值为 "system"、"user"、"assistant" 或 "tool"。' });
+        continue;
+      }
+      if (!VALID_ROLES.includes(msg.role)) {
+        errors.push({ path: path + '.role', category: 'value', label: '字段值错误',
+          message: `role 值 "${escapeHTML(String(msg.role))}" 无效`,
+          suggestion: '请将 role 改为以下之一："system"、"user"、"assistant"、"tool"。' });
+      }
+
+      if (msg.role === 'tool') {
+        if (!('tool_call_id' in msg)) {
+          errors.push({ path, category: 'missing', label: '字段缺失',
+            message: 'role 为 "tool" 的消息缺少必填字段 "tool_call_id"',
+            suggestion: '添加 "tool_call_id" 字段，值应与对应 assistant 消息中 tool_calls[x].id 的值完全一致。' });
+        } else {
+          consumedIds.set(msg.tool_call_id, i);
+        }
+        if (!('content' in msg)) {
+          errors.push({ path, category: 'missing', label: '字段缺失',
+            message: 'role 为 "tool" 的消息缺少必填字段 "content"',
+            suggestion: '添加 "content" 字段，填入工具的返回结果。' });
+        }
+      }
+
+      if ('tool_calls' in msg) {
+        if (msg.role !== 'assistant') {
+          errors.push({ path: path + '.tool_calls', category: 'logic', label: '逻辑错误',
+            message: `只有 role 为 "assistant" 的消息才能包含 "tool_calls"，但当前 role 为 "${escapeHTML(String(msg.role))}"`,
+            suggestion: '将该消息的 role 改为 "assistant"，或将 tool_calls 移到正确的 assistant 消息中。' });
+        }
+        if (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0) {
+          errors.push({ path: path + '.tool_calls', category: 'value', label: '字段值错误',
+            message: 'tool_calls 字段必须是非空数组',
+            suggestion: '确保 tool_calls 是包含至少一个 tool call 对象的数组。' });
+        } else {
+          const seenIds = new Set();
+          for (let j = 0; j < msg.tool_calls.length; j++) {
+            const tc = msg.tool_calls[j];
+            const tpath = tcPath(i, j);
+
+            if (!tc || typeof tc !== 'object') {
+              errors.push({ path: tpath, category: 'type', label: '类型错误',
+                message: 'tool_calls 中的每个元素必须是对象', suggestion: '请检查 tool_calls 数组的元素格式。' });
+              continue;
+            }
+            if (!('id' in tc)) {
+              errors.push({ path: tpath, category: 'missing', label: '字段缺失',
+                message: 'tool_call 缺少必填字段 "id"',
+                suggestion: '添加 "id" 字段，例如 "call_001"，此 id 需要与后续 tool 消息的 tool_call_id 对应。' });
+            } else if (typeof tc.id !== 'string') {
+              errors.push({ path: tpath + '.id', category: 'type', label: '类型错误',
+                message: '"id" 字段的值必须是字符串', suggestion: '将 id 的值改为字符串，例如 "call_001"。' });
+            } else {
+              if (seenIds.has(tc.id)) {
+                errors.push({ path: tpath + '.id', category: 'logic', label: '逻辑错误',
+                  message: `同一消息中存在重复的 tool_call id "${escapeHTML(tc.id)}"`,
+                  suggestion: '同一条消息中每个 tool_call 的 id 必须唯一。' });
+              } else {
+                seenIds.add(tc.id);
+                emittedCalls.set(tc.id, { msgIndex: i, tcIndex: j });
+              }
+            }
+            if (!('type' in tc)) {
+              errors.push({ path: tpath, category: 'missing', label: '字段缺失',
+                message: 'tool_call 缺少必填字段 "type"', suggestion: '添加 "type": "function"。' });
+            } else if (tc.type !== 'function') {
+              errors.push({ path: tpath + '.type', category: 'value', label: '字段值错误',
+                message: `"type" 字段值 "${escapeHTML(String(tc.type))}" 无效，目前只支持 "function"`,
+                suggestion: '将 type 改为 "function"。' });
+            }
+            if (!('function' in tc)) {
+              errors.push({ path: tpath, category: 'missing', label: '字段缺失',
+                message: 'tool_call 缺少必填字段 "function"',
+                suggestion: '添加 "function" 对象，包含 "name" 和 "arguments" 字段。' });
+            } else if (!isPlainObject(tc.function)) {
+              errors.push({ path: tpath + '.function', category: 'type', label: '类型错误',
+                message: '"function" 字段必须是对象', suggestion: '将 function 的值改为对象，包含 "name" 和 "arguments"。' });
+            } else {
+              const fn = tc.function;
+              const fnPath = tpath + ' > function';
+              if (!('name' in fn)) {
+                errors.push({ path: fnPath, category: 'missing', label: '字段缺失',
+                  message: 'function 缺少必填字段 "name"', suggestion: '添加 "name" 字段，填入工具的函数名称。' });
+              } else if (typeof fn.name !== 'string') {
+                errors.push({ path: fnPath + '.name', category: 'type', label: '类型错误',
+                  message: '"name" 字段必须是字符串', suggestion: '将 name 改为字符串类型。' });
+              }
+              if (!('arguments' in fn)) {
+                errors.push({ path: fnPath, category: 'missing', label: '字段缺失',
+                  message: 'function 缺少必填字段 "arguments"',
+                  suggestion: '添加 "arguments" 字段，值必须是 JSON 字符串，例如 "{\\"city\\": \\"北京\\"}"。' });
+              } else if (isPlainObject(fn.arguments) || Array.isArray(fn.arguments)) {
+                errors.push({ path: fnPath + '.arguments', category: 'type', label: '类型错误',
+                  message: '"arguments" 字段的值是 JSON 对象，但 OpenAI 格式要求它必须是序列化后的 JSON 字符串',
+                  suggestion: '将 arguments 的值用 JSON.stringify() 处理，把对象转为字符串。',
+                  code: `❌ 错误写法："arguments": {"city": "北京"}\n✅ 正确写法："arguments": "{\\"city\\": \\"北京\\"}"` });
+              } else if (typeof fn.arguments !== 'string') {
+                errors.push({ path: fnPath + '.arguments', category: 'type', label: '类型错误',
+                  message: '"arguments" 字段必须是字符串类型', suggestion: '将 arguments 改为 JSON 字符串。' });
+              } else {
+                const r = tryParseJSON(fn.arguments);
+                if (!r.ok) {
+                  errors.push({ path: fnPath + '.arguments', category: 'value', label: '字段值错误',
+                    message: '"arguments" 是字符串，但其内容不是合法的 JSON',
+                    suggestion: `解析错误：${escapeHTML(r.error.message)}。请确保 arguments 是合法的 JSON 字符串。` });
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (const [id, info] of emittedCalls) {
+      if (!consumedIds.has(id)) {
+        errors.push({
+          path: `消息[${info.msgIndex}] > tool_calls[${info.tcIndex}].id（ID: "${escapeHTML(id)}"）`,
+          category: 'logic', label: '逻辑错误',
+          message: `assistant 发出了 tool_call（id: "${escapeHTML(id)}"），但后续没有找到对应的 role: "tool" 响应消息`,
+          suggestion: `在此消息之后添加一条 role 为 "tool" 的消息，并设置 "tool_call_id": "${escapeHTML(id)}" 和对应的 "content"。` });
+      }
+    }
+    for (const [id, msgIndex] of consumedIds) {
+      if (!emittedCalls.has(id)) {
+        errors.push({
+          path: `消息[${msgIndex}].tool_call_id（值: "${escapeHTML(id)}"）`,
+          category: 'logic', label: '逻辑错误',
+          message: `tool 消息引用的 tool_call_id "${escapeHTML(id)}" 在所有 assistant 消息的 tool_calls 中找不到`,
+          suggestion: '请核对 tool_call_id 与 assistant 消息中 tool_calls[x].id 的值是否完全一致（区分大小写）。' });
+      } else {
+        const emitInfo = emittedCalls.get(id);
+        if (emitInfo && emitInfo.msgIndex >= msgIndex) {
+          errors.push({ path: `消息[${msgIndex}]`, category: 'logic', label: '逻辑错误',
+            message: `tool 消息（消息[${msgIndex}]）出现在对应 tool_call（消息[${emitInfo.msgIndex}]）之前`,
+            suggestion: '工具响应消息必须出现在对应 tool_call 之后，请调整消息顺序。' });
+        }
+      }
+    }
+    return errors;
+  }
+
+  // ============================================================
+  // Anthropic 验证器
+  // ============================================================
+
+  function validateAnthropic(messages) {
+    const errors = [];
+    const VALID_ROLES = ['user', 'assistant'];
+    const toolUseMap = new Map();
+    const toolResultMap = new Map();
+
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      const path = msgPath(i);
+
+      if (!('role' in msg)) {
+        errors.push({ path, category: 'missing', label: '字段缺失',
+          message: '缺少必填字段 "role"',
+          suggestion: 'Anthropic 格式的 role 只能是 "user" 或 "assistant"。' });
+        continue;
+      }
+      if (!VALID_ROLES.includes(msg.role)) {
+        errors.push({ path: path + '.role', category: 'value', label: '字段值错误',
+          message: `role 值 "${escapeHTML(String(msg.role))}" 无效，Anthropic 格式只支持 "user" 和 "assistant"`,
+          suggestion: '请将 role 改为 "user" 或 "assistant"。' });
+      }
+      if (!('content' in msg)) {
+        errors.push({ path, category: 'missing', label: '字段缺失',
+          message: '缺少必填字段 "content"',
+          suggestion: '添加 "content" 字段，可以是字符串或内容块数组。' });
+        continue;
+      }
+
+      if (Array.isArray(msg.content)) {
+        for (let j = 0; j < msg.content.length; j++) {
+          const block = msg.content[j];
+          const bpath = blockPath(i, j);
+          if (!block || !isPlainObject(block)) {
+            errors.push({ path: bpath, category: 'type', label: '类型错误',
+              message: 'content 数组中的每个元素必须是对象', suggestion: '检查 content 数组的元素格式。' });
+            continue;
+          }
+          if (block.type === 'tool_use') {
+            if (msg.role !== 'assistant') {
+              errors.push({ path: bpath, category: 'logic', label: '逻辑错误',
+                message: '"tool_use" 块只能出现在 role 为 "assistant" 的消息中',
+                suggestion: '将该消息的 role 改为 "assistant"，或移除 tool_use 块。' });
+            }
+            if (!('id' in block)) {
+              errors.push({ path: bpath, category: 'missing', label: '字段缺失',
+                message: 'tool_use 块缺少必填字段 "id"',
+                suggestion: '添加 "id" 字段，例如 "toolu_001"，此 id 需要与后续 tool_result 的 tool_use_id 对应。' });
+            } else if (typeof block.id !== 'string') {
+              errors.push({ path: bpath + '.id', category: 'type', label: '类型错误',
+                message: '"id" 字段必须是字符串', suggestion: '将 id 改为字符串类型。' });
+            } else {
+              if (toolUseMap.has(block.id)) {
+                errors.push({ path: bpath + '.id', category: 'logic', label: '逻辑错误',
+                  message: `tool_use id "${escapeHTML(block.id)}" 在多条消息中重复出现`,
+                  suggestion: 'tool_use 的 id 必须全局唯一，请修改为不同的值。' });
+              } else {
+                toolUseMap.set(block.id, { msgIndex: i, blockIndex: j });
+              }
+            }
+            if (!('name' in block)) {
+              errors.push({ path: bpath, category: 'missing', label: '字段缺失',
+                message: 'tool_use 块缺少必填字段 "name"', suggestion: '添加 "name" 字段，填入工具名称。' });
+            }
+            if (!('input' in block)) {
+              errors.push({ path: bpath, category: 'missing', label: '字段缺失',
+                message: 'tool_use 块缺少必填字段 "input"',
+                suggestion: '添加 "input" 字段，值必须是 JSON 对象（不是字符串），例如 {"city": "北京"}。' });
+            } else if (typeof block.input === 'string') {
+              errors.push({ path: bpath + '.input', category: 'type', label: '类型错误',
+                message: '"input" 字段的值是字符串，但 Anthropic 格式要求它必须是 JSON 对象',
+                suggestion: '将 input 的值从 JSON 字符串改为直接的 JSON 对象。',
+                code: `❌ 错误写法："input": "{\\"city\\": \\"北京\\"}"\n✅ 正确写法："input": {"city": "北京"}` });
+            } else if (!isPlainObject(block.input)) {
+              errors.push({ path: bpath + '.input', category: 'type', label: '类型错误',
+                message: '"input" 字段必须是 JSON 对象（不能是数组或 null）',
+                suggestion: '将 input 改为键值对对象，例如 {"key": "value"}。' });
+            }
+          } else if (block.type === 'tool_result') {
+            if (msg.role !== 'user') {
+              errors.push({ path: bpath, category: 'logic', label: '逻辑错误',
+                message: '"tool_result" 块只能出现在 role 为 "user" 的消息中',
+                suggestion: '将该消息的 role 改为 "user"，或移除 tool_result 块。' });
+            }
+            if (!('tool_use_id' in block)) {
+              errors.push({ path: bpath, category: 'missing', label: '字段缺失',
+                message: 'tool_result 块缺少必填字段 "tool_use_id"',
+                suggestion: '添加 "tool_use_id" 字段，值应与对应 tool_use 块的 "id" 完全一致。' });
+            } else if (typeof block.tool_use_id !== 'string') {
+              errors.push({ path: bpath + '.tool_use_id', category: 'type', label: '类型错误',
+                message: '"tool_use_id" 字段必须是字符串', suggestion: '将 tool_use_id 改为字符串类型。' });
+            } else {
+              toolResultMap.set(block.tool_use_id, { msgIndex: i, blockIndex: j });
+            }
+            if (!('content' in block)) {
+              errors.push({ path: bpath, category: 'missing', label: '字段缺失',
+                message: 'tool_result 块缺少必填字段 "content"',
+                suggestion: '添加 "content" 字段，填入工具的返回结果。' });
+            }
+          }
+        }
+      }
+    }
+
+    if (messages.length > 0 && messages[0].role && messages[0].role !== 'user') {
+      errors.push({ path: '消息[0].role', category: 'logic', label: '逻辑错误',
+        message: 'Anthropic 格式要求第一条消息的 role 必须为 "user"',
+        suggestion: '将第一条消息的 role 改为 "user"，或在前面添加一条 user 消息。' });
+    }
+    for (let i = 1; i < messages.length; i++) {
+      if (messages[i].role && messages[i-1].role && messages[i].role === messages[i-1].role) {
+        errors.push({ path: `消息[${i}].role`, category: 'logic', label: '逻辑错误',
+          message: `消息[${i-1}] 和 消息[${i}] 的 role 都是 "${escapeHTML(messages[i].role)}"，违反了 Anthropic 格式的交替规则`,
+          suggestion: 'Anthropic 格式要求 user → assistant → user → assistant 严格交替，请检查是否遗漏或多余了某条消息。' });
+      }
+    }
+
+    for (const [id, info] of toolUseMap) {
+      if (!toolResultMap.has(id)) {
+        errors.push({ path: `${blockPath(info.msgIndex, info.blockIndex)}（tool_use id: "${escapeHTML(id)}"）`,
+          category: 'logic', label: '逻辑错误',
+          message: `assistant 消息包含了 tool_use（id: "${escapeHTML(id)}"），但后续没有找到对应的 tool_result 块`,
+          suggestion: `在消息[${info.msgIndex}] 之后的 user 消息中添加：\n{"type": "tool_result", "tool_use_id": "${escapeHTML(id)}", "content": "工具返回结果"}` });
+      } else {
+        const resultInfo = toolResultMap.get(id);
+        if (resultInfo.msgIndex <= info.msgIndex) {
+          errors.push({ path: `${blockPath(resultInfo.msgIndex, resultInfo.blockIndex)}`,
+            category: 'logic', label: '逻辑错误',
+            message: `tool_result（tool_use_id: "${escapeHTML(id)}"）出现在对应 tool_use 之前或同一消息中`,
+            suggestion: '工具结果必须出现在工具调用之后的消息中，请调整消息顺序。' });
+        } else if (resultInfo.msgIndex > info.msgIndex + 1) {
+          errors.push({ path: `${blockPath(resultInfo.msgIndex, resultInfo.blockIndex)}`,
+            category: 'logic', label: '逻辑错误',
+            message: `tool_result 没有紧跟在对应 tool_use 之后（tool_use 在消息[${info.msgIndex}]，tool_result 在消息[${resultInfo.msgIndex}]）`,
+            suggestion: 'Anthropic 格式要求 tool_result 必须出现在紧接 tool_use 之后的那条 user 消息中。' });
+        }
+      }
+    }
+    for (const [id, info] of toolResultMap) {
+      if (!toolUseMap.has(id)) {
+        errors.push({ path: `${blockPath(info.msgIndex, info.blockIndex)}.tool_use_id（值: "${escapeHTML(id)}"）`,
+          category: 'logic', label: '逻辑错误',
+          message: `tool_result 引用的 tool_use_id "${escapeHTML(id)}" 在所有 assistant 消息的 tool_use 块中找不到`,
+          suggestion: '请核对 tool_use_id 与对应 tool_use 块的 id 是否完全一致（区分大小写）。' });
+      }
+    }
+    return errors;
+  }
+
+  // ============================================================
+  // 主验证入口
+  // ============================================================
+
+  function validate(jsonString) {
+    const str = jsonString.trim();
+    if (!str) return { format: null, valid: false, errors: [{
+      path: '', category: 'missing', label: '输入为空',
+      message: '请粘贴 JSON 数据后再进行验证', suggestion: '' }]};
+
+    const parsed = tryParseJSON(str);
+    if (!parsed.ok) {
+      const e = parsed.error;
+      let locationHint = '';
+      const posMatch = e.message.match(/position (\d+)/i) || e.message.match(/at (\d+)/i);
+      if (posMatch) {
+        const lc = offsetToLineCol(str, parseInt(posMatch[1]));
+        locationHint = `（第 ${lc.line} 行第 ${lc.col} 列附近）`;
+      }
+      return { format: null, valid: false, errors: [{
+        path: 'JSON 语法' + locationHint, category: 'syntax', label: 'JSON语法错误',
+        message: 'JSON 格式不合法，无法解析',
+        suggestion: `原始错误：${escapeHTML(e.message)}。\n请检查该位置附近的逗号是否遗漏、括号是否配对、引号是否完整。` }]};
+    }
+
+    const data = parsed.value;
+    if (!data || typeof data !== 'object' || Array.isArray(data))
+      return { format: null, valid: false, errors: [{
+        path: '顶层', category: 'type', label: '类型错误',
+        message: 'JSON 的顶层必须是一个对象', suggestion: '请确保 JSON 的最外层是 {}，包含 "messages" 字段。' }]};
+
+    if (!('messages' in data))
+      return { format: null, valid: false, errors: [{
+        path: '顶层', category: 'missing', label: '字段缺失',
+        message: '顶层对象缺少必填字段 "messages"', suggestion: '添加 "messages" 字段，值为消息数组。' }]};
+
+    if (!Array.isArray(data.messages))
+      return { format: null, valid: false, errors: [{
+        path: 'messages', category: 'type', label: '类型错误',
+        message: '"messages" 字段的值必须是数组', suggestion: '将 messages 的值改为数组，例如 []。' }]};
+
+    if (data.messages.length === 0)
+      return { format: 'unknown', valid: false, errors: [{
+        path: 'messages', category: 'warning', label: '警告',
+        message: 'messages 数组为空，没有可验证的消息', suggestion: '请在 messages 数组中添加至少一条消息。' }]};
+
+    const format = detectFormat(data);
+    if (format === 'mixed')
+      return { format: 'mixed', valid: false, errors: [{
+        path: 'messages', category: 'logic', label: '逻辑错误',
+        message: '检测到混合格式信号：同时出现了 OpenAI 格式和 Anthropic 格式',
+        suggestion: '请确认使用单一格式，不要在同一个 JSON 中混用两种格式。' }]};
+
+    let errors = [];
+    if (format === 'openai') errors = validateOpenAI(data.messages);
+    else if (format === 'anthropic') errors = validateAnthropic(data.messages);
+    else {
+      for (let i = 0; i < data.messages.length; i++) {
+        const msg = data.messages[i];
+        if (!('role' in msg)) errors.push({ path: msgPath(i), category: 'missing', label: '字段缺失',
+          message: '缺少必填字段 "role"', suggestion: '添加 "role" 字段。' });
+        if (!('content' in msg)) errors.push({ path: msgPath(i), category: 'missing', label: '字段缺失',
+          message: '缺少必填字段 "content"', suggestion: '添加 "content" 字段。' });
+      }
+    }
+
+    return { format, valid: errors.length === 0, errors };
+  }
+
+  // ============================================================
+  // UI 渲染（验证器）
+  // ============================================================
+
+  const FORMAT_LABELS = {
+    openai: 'OpenAI tool_calls 格式', anthropic: 'Anthropic tool_use 格式',
+    unknown: '通用消息格式（无工具调用）', mixed: '混合格式（异常）', null: '格式未知'
+  };
+  const FORMAT_TAG_CLASS = {
+    openai: 'tag-openai', anthropic: 'tag-anthropic',
+    unknown: 'tag-unknown', mixed: 'tag-unknown', null: 'tag-unknown'
+  };
+  const CATEGORY_CLASS = {
+    syntax: 'cat-syntax', missing: 'cat-missing', type: 'cat-type',
+    value: 'cat-value', logic: 'cat-logic', warning: 'cat-warning'
+  };
+  const BADGE_CLASS = {
+    syntax: 'badge-syntax', missing: 'badge-missing', type: 'badge-type',
+    value: 'badge-value', logic: 'badge-logic', warning: 'badge-warning'
+  };
+
+  function renderErrorCard(err) {
+    const catClass = CATEGORY_CLASS[err.category] || 'cat-logic';
+    const badgeClass = BADGE_CLASS[err.category] || 'badge-logic';
+    const codeBlock = err.code ? `<code class="error-code-block">${escapeHTML(err.code)}</code>` : '';
+    const suggestion = err.suggestion
+      ? `<div class="error-suggestion">修复：${escapeHTML(err.suggestion).replace(/\n/g, '<br>')}</div>` : '';
+    const path = err.path ? `<div class="error-path">${escapeHTML(err.path)}</div>` : '';
+    return `<div class="error-item ${catClass}">
+      <div class="error-top">
+        <span class="error-badge ${badgeClass}">${escapeHTML(err.label || err.category)}</span>${path}
+      </div>
+      <div class="error-message">${escapeHTML(err.message)}</div>
+      ${suggestion}${codeBlock}</div>`;
+  }
+
+  // 当前验证结果（用于收录）
+  let _lastResult = null;
+  let _lastJson = '';
+
+  function renderResult(result) {
+    _lastResult = result;
+    _lastJson = document.getElementById('json-input').value.trim();
+
+    const resultsEl = document.getElementById('results');
+    const contentEl = document.getElementById('result-content');
+    resultsEl.style.display = 'block';
+
+    const formatLabel = FORMAT_LABELS[result.format] || FORMAT_LABELS['null'];
+    const tagClass = FORMAT_TAG_CLASS[result.format] || 'tag-unknown';
+    const formatTag = result.format
+      ? `<span class="result-format-tag ${tagClass}">${escapeHTML(formatLabel)}</span>` : '';
+
+    if (result.valid) {
+      contentEl.innerHTML = `
+        <div class="result-header">
+          <div class="result-icon success">✓</div>
+          <div class="result-title success">格式正确</div>
+          ${formatTag}
+        </div>
+        <div class="success-body">所有字段、类型和对话逻辑均符合 ${escapeHTML(formatLabel)} 规范，可以放心使用！</div>`;
+    } else {
+      const errCount = result.errors.length;
+      const headerIcon = result.errors.some(e => e.category === 'warning') && errCount === 1
+        ? `<div class="result-icon warning">⚠</div><div class="result-title warning">发现 1 个警告</div>`
+        : `<div class="result-icon error">✗</div><div class="result-title error">发现 ${errCount} 个错误</div>`;
+      contentEl.innerHTML = `
+        <div class="result-header">${headerIcon}${formatTag}</div>
+        <div class="error-summary">请根据下方提示逐一修复后重新验证</div>
+        <div class="error-list">${result.errors.map(renderErrorCard).join('')}</div>`;
+    }
+
+    // 更新收录操作栏
+    const bar = document.getElementById('save-action-bar');
+    const hint = document.getElementById('save-action-hint');
+    const btnShowcase = document.getElementById('btn-add-showcase');
+    const btnBadcase = document.getElementById('btn-add-badcase');
+
+    if (result.valid) {
+      hint.textContent = '这是一条格式正确的脚本，可以收录为示范案例';
+      btnShowcase.style.display = 'flex';
+      btnBadcase.style.display = 'none';
+    } else if (result.format !== null || result.errors.some(e => e.category !== 'missing' || e.path !== '')) {
+      hint.textContent = '发现格式错误，可以将此案例收录为典型反例';
+      btnShowcase.style.display = 'none';
+      btnBadcase.style.display = 'flex';
+    } else {
+      bar.classList.remove('visible');
+      return;
+    }
+    bar.classList.add('visible');
+
+    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ============================================================
+  // 导航 & 视图切换
+  // ============================================================
+
+  function switchView(view) {
+    const isLib = view === 'library';
+    document.getElementById('view-validator').style.display = isLib ? 'none' : 'block';
+    document.getElementById('view-library').style.display = isLib ? 'block' : 'none';
+    document.getElementById('tab-validator').classList.toggle('active', !isLib);
+    document.getElementById('tab-library').classList.toggle('active', isLib);
+    if (isLib) {
+      renderLibrary();
+      syncFromCloud(); // 切到案例库时自动拉取云端最新
+    }
+  }
+
+  // ============================================================
+  // Modal（保存对话框）
+  // ============================================================
+
+  let _pendingType = null;
+
+  function openModal(type) {
+    _pendingType = type;
+    const isShowcase = type === 'showcase';
+    document.getElementById('modal-title').textContent = isShowcase ? '★ 收录为 Showcase' : '⚑ 收录为 Badcase';
+    document.getElementById('modal-subtitle').textContent = isShowcase
+      ? '可以添加描述，帮助标注员理解这个案例的亮点'
+      : '可以添加描述，说明这个案例的典型错误类型';
+    document.getElementById('modal-desc').value = '';
+    const confirmBtn = document.getElementById('modal-confirm');
+    confirmBtn.className = `btn ${isShowcase ? 'modal-confirm-showcase' : 'modal-confirm-badcase'}`;
+    confirmBtn.textContent = '确认收录';
+    document.getElementById('modal-overlay').classList.add('open');
+    setTimeout(() => document.getElementById('modal-desc').focus(), 100);
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+    _pendingType = null;
+  }
+
+  function handleOverlayClick(e) {
+    if (e.target === document.getElementById('modal-overlay')) closeModal();
+  }
+
+  function confirmSave() {
+    if (!_pendingType || !_lastResult) return;
+    const desc = document.getElementById('modal-desc').value;
+    addCase(_pendingType, _lastJson, _lastResult.format, _lastResult.errors, desc);
+    closeModal();
+
+    // 反馈
+    const btn = _pendingType === 'showcase'
+      ? document.getElementById('btn-add-showcase')
+      : document.getElementById('btn-add-badcase');
+    const orig = btn.textContent;
+    btn.textContent = '✓ 已收录';
+    btn.disabled = true;
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2000);
+  }
+
+  // ============================================================
+  // 案例库渲染
+  // ============================================================
+
+  let _currentFilter = 'all';
+
+  function setFilter(f) {
+    _currentFilter = f;
+    ['all','showcase','badcase'].forEach(k => {
+      document.getElementById('filter-' + k).className =
+        'filter-btn' + (k === f ? ' active-' + f : '');
+    });
+    renderLibrary();
+  }
+
+  function renderLibrary() {
+    const allCases = loadCases();
+    const cases = _currentFilter === 'all' ? allCases : allCases.filter(c => c.type === _currentFilter);
+    const listEl = document.getElementById('library-list');
+
+    if (cases.length === 0) {
+      listEl.innerHTML = `<div class="empty-state">
+        <div class="big-icon">${_currentFilter === 'showcase' ? '★' : _currentFilter === 'badcase' ? '⚑' : '📂'}</div>
+        <p>${_currentFilter === 'all' ? '还没有收录任何案例，完成验证后点击「收录」按钮添加' :
+            _currentFilter === 'showcase' ? '还没有收录 Showcase 案例' : '还没有收录 Badcase 案例'}</p>
+      </div>`;
+      return;
+    }
+
+    listEl.innerHTML = cases.map(c => renderCaseCard(c)).join('');
+  }
+
+  function renderCaseCard(c) {
+    const formatLabel = FORMAT_LABELS[c.format] || FORMAT_LABELS['null'];
+    const tagClass = FORMAT_TAG_CLASS[c.format] || 'tag-unknown';
+    const desc = c.description
+      ? `<div class="case-description">${escapeHTML(c.description)}</div>`
+      : `<div class="case-no-desc">（未添加描述）</div>`;
+
+    // JSON 预览（取前 8 行）
+    const lines = c.json.split('\n');
+    const preview = lines.slice(0, 12).join('\n');
+    const needsFade = lines.length > 12;
+
+    // Badcase 错误预览
+    let errSection = '';
+    if (c.type === 'badcase' && c.errors && c.errors.length > 0) {
+      const miniErrors = c.errors.slice(0, 5).map(e =>
+        `<div class="case-mini-error"><strong>${escapeHTML(e.label || e.category)}</strong>：${escapeHTML(e.message)}</div>`
+      ).join('');
+      const moreHint = c.errors.length > 5 ? `<div class="case-mini-error" style="color:var(--text-muted)">… 共 ${c.errors.length} 个错误</div>` : '';
+      errSection = `<div class="case-errors-section">
+        <div class="case-errors-toggle" onclick="toggleErrors(this)">▶ 查看错误详情（${c.errors.length} 条）</div>
+        <div class="case-errors-list">${miniErrors}${moreHint}</div>
+      </div>`;
+    }
+
+    return `<div class="case-card">
+      <div class="case-card-header">
+        <span class="case-type-badge ${c.type}">${c.type === 'showcase' ? '★ Showcase' : '⚑ Badcase'}</span>
+        <span class="case-format-tag ${tagClass}">${escapeHTML(formatLabel)}</span>
+        <span class="case-date">${formatDate(c.createdAt)}</span>
+        <button class="case-delete-btn" onclick="confirmDelete('${escapeHTML(c.id)}')" title="删除此案例">✕</button>
+      </div>
+      <div class="case-card-body">
+        ${desc}
+        <div class="case-json-wrap">
+          <div class="case-json-preview" onclick="expandJson(this)">${escapeHTML(preview)}</div>
+          ${needsFade ? '<div class="case-json-fade"></div>' : ''}
+        </div>
+        ${errSection}
+      </div>
+      <div class="case-card-footer">
+        <button class="case-copy-btn" onclick="copyCase('${escapeHTML(c.id)}')">复制 JSON</button>
+        <button class="case-load-btn" onclick="loadCase('${escapeHTML(c.id)}')">填入验证器</button>
+      </div>
+    </div>`;
+  }
+
+  function toggleErrors(el) {
+    const list = el.nextElementSibling;
+    const open = list.classList.toggle('open');
+    el.textContent = el.textContent.replace(open ? '▶' : '▼', open ? '▼' : '▶');
+  }
+
+  function expandJson(el) {
+    if (el.classList.contains('expanded')) return;
+    el.classList.add('expanded');
+    const fade = el.nextElementSibling;
+    if (fade && fade.classList.contains('case-json-fade')) fade.classList.add('hidden');
+    // 填入完整 JSON
+    const card = el.closest('.case-card');
+    const deleteBtn = card.querySelector('.case-delete-btn');
+    // find by id from delete button onclick
+    const onc = deleteBtn.getAttribute('onclick');
+    const m = onc.match(/'([^']+)'/);
+    if (m) {
+      const c = loadCases().find(x => x.id === m[1]);
+      if (c) el.textContent = c.json;
+    }
+  }
+
+  function confirmDelete(id) {
+    if (confirm('确认删除这个案例？此操作不可撤销。')) {
+      deleteCase(id);
+    }
+  }
+
+  function copyCase(id) {
+    const c = loadCases().find(x => x.id === id);
+    if (!c) return;
+    navigator.clipboard.writeText(c.json).then(() => {
+      // 找到按钮并反馈
+      const btns = document.querySelectorAll('.case-copy-btn');
+      btns.forEach(btn => {
+        if (btn.getAttribute('onclick') === `copyCase('${id}')`) {
+          const orig = btn.textContent;
+          btn.textContent = '✓ 已复制';
+          setTimeout(() => { btn.textContent = orig; }, 1500);
+        }
+      });
+    });
+  }
+
+  function loadCase(id) {
+    const c = loadCases().find(x => x.id === id);
+    if (!c) return;
+    switchView('validator');
+    document.getElementById('json-input').value = c.json;
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('save-action-bar').classList.remove('visible');
+    _lastResult = null;
+    document.getElementById('json-input').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // ============================================================
+  // 事件绑定
+  // ============================================================
+
+  const textarea = document.getElementById('json-input');
+  const btnValidate = document.getElementById('btn-validate');
+
+  function doValidate() {
+    btnValidate.disabled = true;
+    btnValidate.textContent = '验证中…';
+    requestAnimationFrame(() => {
+      const result = validate(textarea.value);
+      renderResult(result);
+      btnValidate.disabled = false;
+      btnValidate.textContent = '验证';
+    });
+  }
+
+  btnValidate.addEventListener('click', doValidate);
+
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    textarea.value = '';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('save-action-bar').classList.remove('visible');
+    _lastResult = null;
+    textarea.focus();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); doValidate(); }
+    if (e.key === 'Escape') { closeModal(); closeSettings(); }
+  });
+
+  textarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = textarea.selectionStart, end = textarea.selectionEnd;
+      textarea.value = textarea.value.substring(0, s) + '  ' + textarea.value.substring(end);
+      textarea.selectionStart = textarea.selectionEnd = s + 2;
+    }
+  });
+
+  // 初始化
+  updateBadgeCount();
+  // 若已配置或自动检测到 GitHub 仓库，显示同步状态栏
+  const _initCfg = getEffectiveCfg();
+  if (_initCfg) {
+    const src = getCloudCfg() ? `${_initCfg.owner}/${_initCfg.repo}` : '自动检测';
+    setSyncStatus('local', `已关联 GitHub（${src}），切到「案例库」时自动拉取`);
+  }
+</script>
+</body>
+</html>
